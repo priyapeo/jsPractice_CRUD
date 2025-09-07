@@ -14,11 +14,11 @@ route.get("/", async (req, res) => {
     console.log("fruits",req.query);
     const {name} = req.query;
     const fruits = await db.query(`
-      SELECT * 
-      FROM 
-      fruits
-      WHERE name = ($1)
-      `,[name])
+      SELECT f.id, f.name, c.color
+      FROM fruits f
+      JOIN colors c ON f.id = c.fruit_id
+      ORDER BY f.id;
+    `);
     res.json(fruits.rows);
   } 
   catch (err) {
@@ -26,6 +26,7 @@ route.get("/", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 route.post("/", async (req, res) => {
   try {
@@ -44,6 +45,7 @@ route.post("/", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 route.put("/:id", async (req, res) => {
   try {
@@ -71,29 +73,6 @@ route.put("/:id", async (req, res) => {
 });
 
 
-// route.put("/:id", async (req, res) => {
-//   try {
-//     console.log("PUT /fruits/:id");
-//     console.log("PUT /fruits/:id - updating...");
-    
-//     setTimeout(()=>{
-//       const fruitId = parseInt(req.params.id);
-//     const { name } = req.body;
-
-//     const fruit = fruits.find(f => f.id === fruitId);
-//     if (!fruit) return res.status(404).json({ message: "Fruit not found" });
-//     if (!name) return res.status(400).json({ message: "Name is required" });
-
-//     fruit.name = name;
-//     res.json(fruit);
-//     },2000)
-//   } 
-//   catch (err) {
-//     res.status(500).json({ message: "Server error" });
-//   }
-// });
-
-
 route.delete("/:id", async (req, res) => {
   try {
     console.log("DELETE /fruits/:id - deleting...");
@@ -116,12 +95,6 @@ route.delete("/:id", async (req, res) => {
   }
 });
 
-// Middleware example (commented out)
-// const auth = (req, res, next) => {
-//   console.log("JWT dec.. role = admin  This is a middleware");
-//   next();
-//   // if (!admin) next("Permission Declined!");
-// };
 
 app.use("/api/v1/fruits", route);
 
