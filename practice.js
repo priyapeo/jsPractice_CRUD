@@ -1,4 +1,6 @@
 const express = require('express');
+const { DataTypes } = require("sequelize");
+const sequelize = require("sequelize");
 const db = require('./db');
 const app = express();
 const route = express.Router();
@@ -8,6 +10,17 @@ app.use(express.json());
 
 let fruits = [];
 let nextId = 1;
+
+(
+  async()=>{                           //(this is a iife) 
+  try {
+  await db.authenticate();
+  console.log('Connection has been established successfully.');
+} catch (error) {
+  console.error('Unable to connect to the database:', error);
+}}
+)()
+
 
 route.get("/", async (req, res) => {
   try {
