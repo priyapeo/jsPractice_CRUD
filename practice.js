@@ -1,6 +1,8 @@
 const express = require('express');
 const { DataTypes } = require("sequelize");
-const sequelize = require("sequelize");
+const Sequelize = require("sequelize");
+const Fruit = require('./models/fruit');
+const Color = require('./models/color');
 const db = require('./db');
 const app = express();
 const route = express.Router();
@@ -22,86 +24,129 @@ let nextId = 1;
 )()
 
 
+// route.get("/", async (req, res) => {
+//   try {
+//     console.log("fruits",req.query);
+//     const {name} = req.query;
+//     const fruits = await db.query(`
+//       SELECT f.id, f.name, c.color
+//       FROM fruits f
+//       JOIN colors c ON f.id = c.fruit_id
+//       ORDER BY f.id;
+//     `);
+//     res.json(fruits.rows);
+//   } 
+//   catch (err) {
+//     console.log({err:err.message})
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
+
+
 route.get("/", async (req, res) => {
   try {
     console.log("fruits",req.query);
-    const {name} = req.query;
-    const fruits = await db.query(`
-      SELECT f.id, f.name, c.color
-      FROM fruits f
-      JOIN colors c ON f.id = c.fruit_id
-      ORDER BY f.id;
-    `);
-    res.json(fruits.rows);
-  } 
-  catch (err) {
-    console.log({err:err.message})
+    const fruits = await Fruit.findAll({
+      include: {
+        model: Color,
+        attributes: ['color'],
+      },
+      order: [['id', 'ASC']],
+    });
+    res.json(fruits);
+  } catch (err) {
+    console.error(err.message);
     res.status(500).json({ message: "Server error" });
   }
 });
 
+
+// route.post("/", async (req, res) => {
+//   try {
+//     console.log("POST /fruits - adding...");
+
+//     const { name } = req.body;
+//     if (!name) return res.status(400).json({ message: "Name is required" });
+
+//     const newFruit = await db.query("INSERT INTO fruits (name) VALUES ($1)",
+//       [name]
+//     );
+
+//     res.status(201).json(newFruit.rows[0]);
+//   } catch (err) {
+//     console.error(err.message);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
 
 route.post("/", async (req, res) => {
   try {
-    console.log("POST /fruits - adding...");
-
     const { name } = req.body;
     if (!name) return res.status(400).json({ message: "Name is required" });
 
-    const newFruit = await db.query("INSERT INTO fruits (name) VALUES ($1)",
-      [name]
-    );
-
-    res.status(201).json(newFruit.rows[0]);
+    const newFruit = await Fruit.create({ name });
+    res.status(201).json(newFruit);
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ message: "Server error" });
   }
 });
 
+// route.put("/:id", async (req, res) => {
+//   try {
+//     console.log("PUT /fruits/:id - updating...");
+
+//     const fruitId = parseInt(req.params.id);
+//     const { name } = req.body;
+
+//     if (!name) return res.status(400).json({ message: "Name is required" });
+
+//     const fruit = await db.query(
+//       "UPDATE fruits SET name = $1 WHERE id = $2 RETURNING *",
+//       [name, fruitId]
+//     );
+
+//     if (fruit.rows.length === 0) {
+//       return res.status(404).json({ message: "Fruit not found" });
+//     }
+
+//     res.json(fruit.rows[0]);
+//   } catch (err) {
+//     console.error(err.message);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
 
 route.put("/:id", async (req, res) => {
   try {
-    console.log("PUT /fruits/:id - updating...");
-
     const fruitId = parseInt(req.params.id);
     const { name } = req.body;
 
     if (!name) return res.status(400).json({ message: "Name is required" });
 
-    const fruit = await db.query(
-      "UPDATE fruits SET name = $1 WHERE id = $2 RETURNING *",
-      [name, fruitId]
-    );
+    const fruit = await Fruit.findByPk(fruitId);
+    if (!fruit) return res.status(404).json({ message: "Fruit not found" });
 
-    if (fruit.rows.length === 0) {
-      return res.status(404).json({ message: "Fruit not found" });
-    }
+    fruit.name = name;
+    await fruit.save();
 
-    res.json(fruit.rows[0]);
+    res.json(fruit);
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ message: "Server error" });
   }
 });
 
-
 route.delete("/:id", async (req, res) => {
   try {
-    console.log("DELETE /fruits/:id - deleting...");
-
     const fruitId = parseInt(req.params.id);
 
-    const fruit = await db.query(
-      "DELETE FROM fruits WHERE id = $1 RETURNING *",
-      [fruitId]
-    );
+    const fruit = await Fruit.findByPk(fruitId);
+    if (!fruit) return res.status(404).json({ message: "Fruit not found" });
 
-    if (fruit.rows.length === 0) {
-      return res.status(404).json({ message: "Fruit not found" });
-    }
+    await fruit.destroy();
 
-    res.json({ message: `Fruit ID ${fruitId} deleted`});
+     res.json({ message: `Fruit ID ${fruitId} deleted` });
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ message: "Server error" });
