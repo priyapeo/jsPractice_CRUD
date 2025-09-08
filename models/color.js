@@ -3,11 +3,11 @@ const db = require('../db');
 const Fruit = require('./fruit');
 
 const Color = db.define('Color', {
-    id:{
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    allowNull: false,
-    },
+    // id:{
+    // type: DataTypes.INTEGER,
+    // primaryKey: true,
+    // allowNull: false,
+    // },
     fruit_id:{
     type: DataTypes.INTEGER,
     allowNull: false,

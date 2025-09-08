@@ -14,7 +14,7 @@ let fruits = [];
 let nextId = 1;
 
 (
-  async()=>{                           //(this is a iife) 
+  async()=>{                           //(this is a IIFE) 
   try {
   await db.authenticate();
   console.log('Connection has been established successfully.');
@@ -79,13 +79,35 @@ route.get("/", async (req, res) => {
 //   }
 // });
 
-route.post("/", async (req, res) => {
+route.post("/", async (req, res) => {                           //create fruit api
   try {
     const { name } = req.body;
     if (!name) return res.status(400).json({ message: "Name is required" });
 
     const newFruit = await Fruit.create({ name });
     res.status(201).json(newFruit);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+route.post("/:id/color", async (req, res) => {                 //add color api
+  try {
+    const fruitId = parseInt(req.params.id);
+    const { color } = req.body;
+
+    if (!color) return res.status(400).json({ message: "Color is required" });
+   
+    const fruit = await Fruit.findByPk(fruitId);
+    if (!fruit) return res.status(404).json({ message: "Fruit not found" });
+
+    const newColor = await Color.create({
+      color,
+      fruit_id: fruitId
+    });
+
+    res.status(201).json(newColor);
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ message: "Server error" });
@@ -117,7 +139,7 @@ route.post("/", async (req, res) => {
 //   }
 // });
 
-route.put("/:id", async (req, res) => {
+route.put("/:id", async (req, res) => {             //update fruit api
   try {
     const fruitId = parseInt(req.params.id);
     const { name } = req.body;
