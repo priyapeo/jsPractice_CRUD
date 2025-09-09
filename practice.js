@@ -3,6 +3,9 @@ const { DataTypes } = require("sequelize");
 const Sequelize = require("sequelize");
 const Fruit = require('./models/fruit');
 const Color = require('./models/color');
+const User = require('./models/user');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const db = require('./db');
 const app = express();
 const route = express.Router();
@@ -10,38 +13,82 @@ const PORT = 3000;
 
 app.use(express.json());
 
-let fruits = [];
-let nextId = 1;
-
-(
-  async()=>{                           //(this is a IIFE) 
+(async () => {
   try {
-  await db.authenticate();
-  console.log('Connection has been established successfully.');
-} catch (error) {
-  console.error('Unable to connect to the database:', error);
-}}
-)()
+    await db.authenticate();
+    console.log('Connection has been established successfully.');
+
+    await db.sync({ alter: true });
+    console.log('All models synchronized successfully.');
+  } catch (error) {
+    console.error('Unable to connect to the database:', error);
+  }
+})();
+
+const JWT_SECRET = 'your_secret_key_here';
 
 
-// route.get("/", async (req, res) => {
-//   try {
-//     console.log("fruits",req.query);
-//     const {name} = req.query;
-//     const fruits = await db.query(`
-//       SELECT f.id, f.name, c.color
-//       FROM fruits f
-//       JOIN colors c ON f.id = c.fruit_id
-//       ORDER BY f.id;
-//     `);
-//     res.json(fruits.rows);
-//   } 
-//   catch (err) {
-//     console.log({err:err.message})
-//     res.status(500).json({ message: "Server error" });
-//   }
-// });
+route.post("/register", async (req, res) => {
+  const { username, password } = req.body;
 
+  if (!username || !password)
+    return res.status(400).json({ message: "Username and password required" });
+
+  try {
+    const existingUser = await User.findOne({ where: { username } });
+    if (existingUser)
+      return res.status(400).json({ message: "That username is taken. Try another" });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({ username, password: hashedPassword });
+
+    res.status(201).json({ message: `Hello ${user.username}`});
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+route.post("/login", async (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password)
+    return res.status(400).json({ message: "Username and password required" });
+
+    try {
+    const user = await User.findOne({ where: { username } });
+    if (!user)
+      return res.status(400).json({ message: "Invalide username" });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch)
+      return res.status(400).json({ message: "Invalide password" });
+
+     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
+     res.json({ token });
+  }catch (err) {
+    console.error(err.message);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+const authenticate = (req, res, next) => {
+  const token = req.headers['authorization'];
+
+  if (!token)
+    return res.status(400).json({ message: 'Unauthorized' });
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.user = payload;
+    next();
+  } catch (err) {
+    return res.status(401).json({ message: 'Invalid or expired token' });
+  }
+};
+
+route.use(authenticate);
 
 route.get("/", async (req, res) => {
   try {
@@ -59,25 +106,6 @@ route.get("/", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
-
-// route.post("/", async (req, res) => {
-//   try {
-//     console.log("POST /fruits - adding...");
-
-//     const { name } = req.body;
-//     if (!name) return res.status(400).json({ message: "Name is required" });
-
-//     const newFruit = await db.query("INSERT INTO fruits (name) VALUES ($1)",
-//       [name]
-//     );
-
-//     res.status(201).json(newFruit.rows[0]);
-//   } catch (err) {
-//     console.error(err.message);
-//     res.status(500).json({ message: "Server error" });
-//   }
-// });
 
 route.post("/", async (req, res) => {                           //create fruit api
   try {
@@ -114,30 +142,6 @@ route.post("/:id/color", async (req, res) => {                 //add color api
   }
 });
 
-// route.put("/:id", async (req, res) => {
-//   try {
-//     console.log("PUT /fruits/:id - updating...");
-
-//     const fruitId = parseInt(req.params.id);
-//     const { name } = req.body;
-
-//     if (!name) return res.status(400).json({ message: "Name is required" });
-
-//     const fruit = await db.query(
-//       "UPDATE fruits SET name = $1 WHERE id = $2 RETURNING *",
-//       [name, fruitId]
-//     );
-
-//     if (fruit.rows.length === 0) {
-//       return res.status(404).json({ message: "Fruit not found" });
-//     }
-
-//     res.json(fruit.rows[0]);
-//   } catch (err) {
-//     console.error(err.message);
-//     res.status(500).json({ message: "Server error" });
-//   }
-// });
 
 route.put("/:id", async (req, res) => {             //update fruit api
   try {
