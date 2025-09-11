@@ -6,6 +6,7 @@ const Color = require('./models/color');
 const User = require('./models/user');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+require('dotenv').config();
 const db = require('./db');
 const app = express();
 const route = express.Router();
@@ -19,36 +20,43 @@ app.use(express.json());
     console.log('Connection has been established successfully.');
 
     await db.sync({ alter: true });
-    console.log('All models synchronized successfully.');
+    console.log('All models synced successfully.');
   } catch (error) {
     console.error('Unable to connect to the database:', error);
   }
 })();
 
-const JWT_SECRET = 'your_secret_key_here';
 
+const Secret = process.env.JWT_SECRET;
 
-route.post("/register", async (req, res) => {
+function processName(username, callback) {
+  console.log("Processing name...");
+  const processedName = username.trim().toUpperCase();
+  callback(processedName);
+}
+
+route.post("/register", (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password)
     return res.status(400).json({ message: "Username and password required" });
 
-  try {
-    const existingUser = await User.findOne({ where: { username } });
-    if (existingUser)
-      return res.status(400).json({ message: "That username is taken. Try another" });
+  processName(username, async (processedUsername) => {
+    try {
+      const existingUser = await User.findOne({ where: { username: processedUsername } });
+      if (existingUser)
+        return res.status(400).json({ message: "That username is taken. Try another" });
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ username, password: hashedPassword });
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await User.create({ username: processedUsername, password: hashedPassword });
 
-    res.status(201).json({ message: `Hello ${user.username}`});
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ message: "Server error" });
-  }
+      res.status(201).json({ message: `Hello ${user.username}, you registered successfully` });
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
 });
-
 
 route.post("/login", async (req, res) => {
     const { username, password } = req.body;
@@ -59,13 +67,13 @@ route.post("/login", async (req, res) => {
     try {
     const user = await User.findOne({ where: { username } });
     if (!user)
-      return res.status(400).json({ message: "Invalide username" });
+      return res.status(401).json({ message: "Invalide username" });
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
-      return res.status(400).json({ message: "Invalide password" });
+      return res.status(401).json({ message: "Invalide password" });
 
-     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
+     const token = jwt.sign({ userId: user.id }, Secret, { expiresIn: '1h' });
      res.json({ token });
   }catch (err) {
     console.error(err.message);
@@ -77,20 +85,21 @@ const authenticate = (req, res, next) => {
   const token = req.headers['authorization'];
 
   if (!token)
-    return res.status(400).json({ message: 'Unauthorized' });
+    return res.status(401).json({ message: 'Unauthorized' });
 
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    req.user = payload;
-    next();
-  } catch (err) {
-    return res.status(401).json({ message: 'Invalid or expired token' });
-  }
+  const payload = jwt.verify(token, Secret);
+  req.user = payload;
+  next();
+} catch (err) {
+  return res.status(403).json({ message: 'Invalid or expired token' });
+}
+
 };
 
-route.use(authenticate);
+// route.use(authenticate);
 
-route.get("/", async (req, res) => {
+route.get("/",authenticate, async (req, res) => {
   try {
     console.log("fruits",req.query);
     const fruits = await Fruit.findAll({
@@ -107,7 +116,7 @@ route.get("/", async (req, res) => {
   }
 });
 
-route.post("/", async (req, res) => {                           //create fruit api
+route.post("/",authenticate, async (req, res) => {                           //create fruit api
   try {
     const { name } = req.body;
     if (!name) return res.status(400).json({ message: "Name is required" });
@@ -181,6 +190,15 @@ route.delete("/:id", async (req, res) => {
 
 
 app.use("/api/v1/fruits", route);
+
+
+// const app_ ={
+//   use:(url,...functions)=> {
+//     if( typeof url === "string" ) throw new Error("");
+
+//     functions (req,res,next)
+//   }
+// }
 
 app.use((err, req, res, next) => {
 console.error(err.stack);
