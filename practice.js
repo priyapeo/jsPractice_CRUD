@@ -30,7 +30,6 @@ app.use(express.json());
 const Secret = process.env.JWT_SECRET;
 
 function processName(username, callback) {
-  console.log("Processing name...");
   const processedName = username.trim().toUpperCase();
   callback(processedName);
 }
@@ -116,39 +115,117 @@ route.get("/",authenticate, async (req, res) => {
   }
 });
 
-route.post("/",authenticate, async (req, res) => {                           //create fruit api
-  try {
-    const { name } = req.body;
-    if (!name) return res.status(400).json({ message: "Name is required" });
+//   if (!name) return callback(new Error("Name is required"));
 
-    const newFruit = await Fruit.create({ name });
-    res.status(201).json(newFruit);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ message: "Server error" });
+//   Fruit.create({ name })
+//     .then(fruit => callback(null, fruit))
+//     .catch(err => callback(err));
+//  }
+
+// route.post("/",authenticate, (req, res) => {
+//   const { name } = req.body;
+//   createFruit(name, (err, fruit) => {
+//     if (err) {
+//       console.error(err.message);
+//       return res.status(500).json({ message: "Server error" });
+//     }
+//     res.status(201).json(fruit);
+//   });
+// });
+
+// route.post("/", authenticate, async (req, res) => {
+//   try {
+//     const { name } = req.body;
+
+//     if (!name) {
+//       return res.status(400).json({ message: "Name is required" });
+//     }
+//     const newFruit = await Fruit.create({ name: name.trim() });
+
+//     res.status(201).json(newFruit);
+//   } catch (err) {
+//     console.error("Error creating fruit:", err.message);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
+
+
+// route.post("/:id/color", async (req, res) => {                 //add color api
+//   try {
+//     const fruitId = parseInt(req.params.id);
+//     const { color } = req.body;
+
+//     if (!color) return res.status(400).json({ message: "Color is required" });
+   
+//     const fruit = await Fruit.findByPk(fruitId);
+//     if (!fruit) return res.status(404).json({ message: "Fruit not found" });
+
+//     const newColor = await Color.create({
+//       color,
+//       fruit_id: fruitId
+//     });
+
+//     res.status(201).json(newColor);
+//   } catch (err) {
+//     console.error(err.message);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// });
+
+function createRecord(model, data, callback, requiredFields = []) {
+  if (!data || Object.keys(data).length === 0) {
+    return callback(new Error("Data is missing"));
   }
+if(!Array.isArray(requiredFields)) return callback(new Error(`Invalid format`));
+  for (const field of requiredFields) {
+    const value = data[field];
+
+    if (value === undefined || value === null || value.toString().trim() === "") {
+      return callback(new Error(`${field} is required`));
+    }
+  }
+
+  model.create(data)
+    .then(record => callback(null, record))
+    .catch(err => callback(err));
+}
+
+route.post("/", (req, res) => {
+  createRecord(Fruit, req.body, (err, fruit) => {
+    if (err) {
+      console.error(err.message);
+      const status = err.message.includes("missing") || err.message.includes("required") 
+        ? 400 
+        : 500;
+
+      return res.status(status).json({ message: err.message });
+    }
+
+    res.status(201).json(fruit);
+  }, ['name']); 
 });
 
-route.post("/:id/color", async (req, res) => {                 //add color api
-  try {
-    const fruitId = parseInt(req.params.id);
-    const { color } = req.body;
 
-    if (!color) return res.status(400).json({ message: "Color is required" });
-   
-    const fruit = await Fruit.findByPk(fruitId);
-    if (!fruit) return res.status(404).json({ message: "Fruit not found" });
+route.post("/:id/color", async (req, res) => {
+  const fruitId = parseInt(req.params.id);
 
-    const newColor = await Color.create({
-      color,
-      fruit_id: fruitId
-    });
+  const fruit = await Fruit.findByPk(fruitId);
+    if (!fruit) return res.status(404).json({ message: "Invalide FruitID" });
+    
+  const data = { ...req.body, fruit_id: fruitId };
+
+  createRecord(Color, data, (err, newColor) => {
+    if (err) {
+      console.error(err.message);
+
+      const status = err.message.includes("missing")  || err.message.includes("required")
+      ? 400
+      : 500;
+      return res.status(status).json({ message: err.message });
+    }
 
     res.status(201).json(newColor);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ message: "Server error" });
-  }
+  }, ['color', 'fruit_id']);
 });
 
 
